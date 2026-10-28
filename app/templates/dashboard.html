@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI API Sentinel</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+</head>
+<body>
+
+    <header class="navbar">
+        <div class="brand">
+            <div class="brand-icon">⚡</div>
+            <div class="brand-text">
+                <h1>FastAPI API Sentinel</h1>
+            </div>
+        </div>
+        <div class="nav-actions">
+            <div class="badge-pill">
+                <span class="pulse-dot"></span>
+                <span>Live</span>
+            </div>
+            <button id="toggle-refresh-btn" class="btn btn-primary">Auto-Refresh: ON</button>
+            <a href="/docs" target="_blank" class="btn btn-outline">Docs</a>
+            <a href="/metrics" target="_blank" class="btn btn-outline">Metrics</a>
+        </div>
+    </header>
+
+    <main class="container">
+
+        <section id="status-banner" class="status-banner">
+            <div class="status-banner-left">
+                <div id="status-dot" class="pulse-dot" style="width: 14px; height: 14px;"></div>
+                <div>
+                    <div id="status-text" class="status-title">CHECKING HEALTH...</div>
+                    <div id="status-desc" class="status-subtitle">Connecting...</div>
+                </div>
+            </div>
+            <div>
+                <button class="btn btn-outline" onclick="fetchStats()">Refresh</button>
+            </div>
+        </section>
+
+        <section class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Uptime</div>
+                <div class="kpi-value"><span id="kpi-uptime">100.0%</span></div>
+                <div class="kpi-footer">
+                    <span style="color: var(--color-success)">●</span> Availability
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Avg Response Time</div>
+                <div class="kpi-value"><span id="kpi-latency">0.0 ms</span></div>
+                <div class="kpi-footer">
+                    <span id="kpi-p95" style="color: #60a5fa;">P95: 0.0 ms</span> &bull; SLA: 3000ms
+                </div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Total Requests</div>
+                <div class="kpi-value"><span id="kpi-total-reqs">0</span></div>
+                <div class="kpi-footer">All endpoints</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Failed Requests</div>
+                <div class="kpi-value">
+                    <span id="kpi-failed-reqs" style="color: #f87171;">0</span>
+                    <span class="kpi-unit">(<span id="kpi-error-rate">0.0%</span>)</span>
+                </div>
+                <div class="kpi-footer">4xx / 5xx errors</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Active Alerts</div>
+                <div class="kpi-value"><span id="kpi-alerts-count" style="color: #fbbf24;">0</span></div>
+                <div class="kpi-footer">Pending resolution</div>
+            </div>
+        </section>
+
+        <section class="simulator-panel">
+            <div class="panel-header">
+                <div>
+                    <h3>Simulation & Testing</h3>
+                    <p class="panel-desc">Trigger test failure conditions to verify alerting and diagnostics.</p>
+                </div>
+            </div>
+            <div class="sim-buttons">
+                <button class="btn-sim sim-danger" onclick="runSimulation('500-error')">
+                    500 Server Error
+                </button>
+                <button class="btn-sim sim-warning" onclick="runSimulation('timeout')">
+                    Timeout (>3s)
+                </button>
+                <button class="btn-sim sim-warning" onclick="runSimulation('auth-failure')">
+                    401 Unauthorized
+                </button>
+                <button class="btn-sim sim-warning" onclick="runSimulation('rate-limit')">
+                    429 Rate Limit
+                </button>
+                <button class="btn-sim sim-danger" onclick="runSimulation('health-failure')">
+                    503 Health Failure
+                </button>
+                <button class="btn-sim sim-danger" onclick="runSimulation('downtime')">
+                    503 API Downtime
+                </button>
+                <button class="btn-sim sim-warning" onclick="runSimulation('error-rate')">
+                    High Error Rate
+                </button>
+                <button class="btn-sim sim-success" onclick="runSimulation('burst-traffic')">
+                    Traffic Burst (20 reqs)
+                </button>
+            </div>
+        </section>
+
+        <section class="charts-grid">
+            <div class="card">
+                <div class="card-title">
+                    <span>Throughput & Error Trends</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span>HTTP Status Distribution</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section class="tables-grid">
+            <div class="card">
+                <div class="card-title">
+                    <span>Incident Alerts</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Severity</th>
+                                <th>Incident Title</th>
+                                <th>Channels</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alerts-table-body">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                    Loading alerts...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">
+                    <span>Live Request Telemetry</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Method</th>
+                                <th>Endpoint</th>
+                                <th>Status</th>
+                                <th>Latency</th>
+                                <th>Client IP</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="telemetry-table-body">
+                            <tr>
+                                <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                                    Loading request telemetry...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="rca-modal" class="modal-overlay" onclick="if(event.target === this) closeModal()">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="rca-modal-title" style="font-size: 16px;">Root Cause Analysis</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="rca-modal-body"></div>
+            <div style="margin-top: 24px; text-align: right;">
+                <button class="btn btn-outline" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
